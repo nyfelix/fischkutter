@@ -1,0 +1,5 @@
+#define BOAT_NAME "MS Fishy"
+#define PIN_STEAMING_LIGHT 13
+#define PIN_FISHING_LIGHT 14
+#define PIN_RC_LIGHT_SWITCH 15
+#define HTTP_PORT 80

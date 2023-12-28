@@ -2,18 +2,23 @@
 #include <heltec.h>
 #include <WiFi.h>
 #include <WiFiAP.h>
+#include "debug.h"
+#include "config.h"
+#include "secrets.h"
 
 
 void drawWelcomeScreen();
 void createWifiHotspot();
-void listenForClients();
+void listenWiFi();
+void listenRC();
 String handleRequest(String req);
+void switchSteamingLight(bool on);
+void switchFishingLight(bool on);
 
-//const char *ssid = "MSFishyAP";
-//const char *password = "1234";
-const char *ssid = "FerdinandAir";
-const char *password = "Lychee2011";
-#define BOAT_NAME "MS Fishy"
+const char *ssid = SSID;
+const char *password = PASSWORD;
+bool steamingLightOn = false;
+bool fishingLightOn = false;
 
 WiFiServer server;
 WiFiClient client;
@@ -21,26 +26,28 @@ WiFiClient client;
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  Serial.println("Starting up...");
-  Serial.println("Welcome on board of " + String(BOAT_NAME));
+  debugLn("Welcome on board of " + String(BOAT_NAME));
+  debugLn("Starting up...");
   // Prepare GPIO for Light
-  pinMode(13, OUTPUT);
-
+  pinMode(PIN_STEAMING_LIGHT, OUTPUT);
+  pinMode(PIN_FISHING_LIGHT, OUTPUT);
+  pinMode(PIN_RC_LIGHT_SWITCH, INPUT);
+  digitalWrite(PIN_STEAMING_LIGHT, LOW);
+  digitalWrite(PIN_FISHING_LIGHT, LOW);
+  debugLn("   ... Light pins set");
   // Prepare Display
   Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/);
   Heltec.display->setFont(ArialMT_Plain_10);
   Heltec.display->flipScreenVertically();
+  debugLn("   ... Display ready");
   // Prepare Wifi
   createWifiHotspot();
   drawWelcomeScreen();
 }
 
 void loop() {
-  Serial.println("Hello World!");
-  digitalWrite(13, HIGH);
-  delay(1000);
-  digitalWrite(13, LOW);
-  delay(1000);
+  listenWiFi();
+  listenRC();
 }
 
 void drawWelcomeScreen() {
@@ -56,20 +63,37 @@ void createWifiHotspot() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
-
-  Serial.println(F("Configuring access point."));
-  WiFi.mode(WIFI_STA);
-  if (!WiFi.begin(ssid, password)) {
+  debugLn("   ... Configuring access point.");
+  WiFi.mode(WIFI_AP);
+  if (!WiFi.softAP(ssid, password)) {
     Serial.println("Failed to set up AP");
     return;
   }
   IPAddress IP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(IP);
-  server.begin(80);
+  debug("AP IP address: ");
+  debugLn(IP);
+  server.begin(HTTP_PORT);
 }
 
-void listenForClients() {
+void listenRC() {
+  if (digitalRead(PIN_RC_LIGHT_SWITCH) == HIGH) {
+    switchSteamingLight(true);
+  } else {
+    switchSteamingLight(false);
+  }
+}
+
+void switchSteamingLight(bool on) {
+  steamingLightOn = !steamingLightOn;
+  digitalWrite(PIN_STEAMING_LIGHT, steamingLightOn ? HIGH : LOW);
+}
+
+void switchFishingLight(bool on) {
+  fishingLightOn = !fishingLightOn;
+  digitalWrite(PIN_FISHING_LIGHT, fishingLightOn ? HIGH : LOW);
+}
+
+void listenWiFi() {
 if (!client) {
     client = server.available();
   }
